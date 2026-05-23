@@ -1,0 +1,19 @@
+{
+  "contract_id": "orders",
+  "version": "1.2.0",
+  "owner": "revenue-platform",
+  "table": "orders",
+  "fields": [
+    { "name": "id", "type": "string", "required": true, "unique": true },
+    { "name": "customer_id", "type": "string", "required": true },
+    { "name": "amount", "type": "decimal", "required": true, "check": { "min": 0 } },
+    { "name": "currency", "type": "string", "required": true, "check": { "enum": ["USD", "EUR", "GBP"] } },
+    { "name": "status", "type": "string", "required": true, "check": { "enum": ["pending", "paid", "refunded"] } },
+    { "name": "metadata", "type": "json" },
+    { "name": "created_at", "type": "timestamp", "required": true }
+  ],
+  "primary_key": ["id"],
+  "foreign_keys": [
+    { "columns": ["customer_id"], "references_table": "customers", "references_columns": ["id"] }
+  ]
+}

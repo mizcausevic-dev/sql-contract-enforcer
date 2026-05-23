@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sql-contract-enforcer"
+version = "0.1.0"
+description = "Turn a data contract into enforceable, cross-dialect DDL — CHECK / NOT NULL / UNIQUE / PRIMARY KEY / FOREIGN KEY for Postgres, MySQL, Snowflake, and BigQuery — plus a contract-vs-schema violation checker. Cross-ecosystem hook #5 of the Kinetic Gain portfolio."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "Miz Causevic", email = "miz@kineticgain.com" }]
+keywords = [
+    "sql", "ddl", "data-contracts", "data-quality", "postgres", "mysql",
+    "snowflake", "bigquery", "cross-dialect", "kinetic-gain-protocol-suite",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[project.scripts]
+sql-contract-enforcer = "sql_contract_enforcer.__main__:main"
+
+[project.urls]
+Homepage = "https://kineticgain.com/"
+Repository = "https://github.com/mizcausevic-dev/sql-contract-enforcer"
+"Data contract source" = "https://github.com/mizcausevic-dev/data-contract-registry"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sql_contract_enforcer"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "W"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true

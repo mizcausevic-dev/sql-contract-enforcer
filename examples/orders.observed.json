@@ -1,0 +1,8 @@
+[
+  { "name": "id", "nullable": false },
+  { "name": "customer_id", "nullable": true },
+  { "name": "amount", "nullable": false },
+  { "name": "currency", "nullable": false },
+  { "name": "created_at", "nullable": false },
+  { "name": "legacy_notes", "nullable": true }
+]
