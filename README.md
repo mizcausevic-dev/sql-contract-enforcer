@@ -1,6 +1,6 @@
 # sql-contract-enforcer
 
-> Turn a data contract into **enforceable, cross-dialect DDL** — and check an existing schema against the contract. Postgres · MySQL · Snowflake · BigQuery.
+> Generate DDL from this package's SQL contract model and compare declared columns with an observed schema. Postgres · MySQL · Snowflake · BigQuery. Constraint enforcement varies by engine.
 
 ```bash
 sql-contract-enforcer generate examples/orders.contract.json --dialect postgres
@@ -25,7 +25,7 @@ CREATE TABLE "orders" (
 );
 ```
 
-This is **cross-ecosystem hook #5** in the Kinetic Gain portfolio. Where [`data-contract-registry`](https://github.com/mizcausevic-dev/data-contract-registry) *stores* the contract and [`csv-data-quality-rs`](https://github.com/mizcausevic-dev/csv-data-quality-rs) *validates rows* against it, this tool turns the same contract into the table-level constraints that stop bad data at the boundary — `NOT NULL`, `CHECK`, `UNIQUE`, `PRIMARY KEY`, `FOREIGN KEY` — in whatever dialect your warehouse speaks.
+This is a proposed fifth cross-ecosystem hook in the Kinetic Gain portfolio. [`data-contract-registry`](https://github.com/mizcausevic-dev/data-contract-registry) stores its own contract shape and [`csv-data-quality-rs`](https://github.com/mizcausevic-dev/csv-data-quality-rs) validates CSV rows. This package consumes a **different SQL contract shape** and generates table definitions. An explicit adapter can produce a SQL proposal from the registry source v0.2 JSON shape, but it does not prove that CSV and database behavior are equivalent.
 
 ## The hard part: dialects actually differ
 
@@ -33,7 +33,7 @@ The value here is correct cross-dialect SQL, not string templating. The generato
 
 | Capability | Postgres | MySQL | Snowflake | BigQuery |
 | --- | --- | --- | --- | --- |
-| `CHECK` constraints | ✅ enforced | ✅ enforced (8.0.16+) | ⚠️ parsed, not enforced | ❌ **unsupported** → emitted as comments |
+| `CHECK` constraints | ✅ enforced | ✅ enforced (8.0.16+) | ✅ enforced on standard tables | ❌ **unsupported** → emitted as comments |
 | `UNIQUE` | ✅ enforced | ✅ enforced | ⚠️ informational | ❌ **no syntax** → omitted + commented |
 | `PRIMARY KEY` / `FOREIGN KEY` | ✅ enforced | ✅ enforced | ⚠️ informational | ⚠️ `NOT ENFORCED` metadata only |
 | `string` type | `TEXT` | `VARCHAR(255)` | `STRING` | `STRING` |
@@ -41,11 +41,11 @@ The value here is correct cross-dialect SQL, not string templating. The generato
 | `timestamp` type | `TIMESTAMPTZ` | `DATETIME` | `TIMESTAMP_TZ` | `TIMESTAMP` |
 | `json` type | `JSONB` | `JSON` | `VARIANT` | `JSON` |
 
-So the **same contract** yields valid, idiomatic DDL on each engine — BigQuery gets `PRIMARY KEY (...) NOT ENFORCED` and its un-expressible constraints surfaced as comments instead of silently dropped; Snowflake gets a header note that its UNIQUE/CHECK/FK are informational; MySQL gets explicit `VARCHAR` lengths.
+The SQL contract can be rendered for each engine. BigQuery gets `PRIMARY KEY (...) NOT ENFORCED` and unsupported constraints are surfaced as comments; Snowflake's standard tables enforce `NOT NULL` and `CHECK`, while key constraints are informational. Generated output has unit tests, but has **not** been executed against real Postgres, MySQL, Snowflake, or BigQuery instances. Review the output and test it on the target engine before applying it.
 
 ## Contract format
 
-A small JSON subset compatible with `data-contract-registry`:
+A SQL-specific JSON model:
 
 ```json
 {
@@ -66,6 +66,22 @@ A small JSON subset compatible with `data-contract-registry`:
 
 Logical types: `string · integer · decimal · boolean · timestamp · date · json`. Per-field checks: `min`, `max`, `enum`.
 
+Identifiers are limited to 1–64 ASCII letters, digits, or underscores and must start with a letter or underscore. DDL generation rejects enum strings with backslashes or control characters until their quoting is tested on each engine. Numeric bounds require an integer or decimal field, must fit `NUMERIC(38,9)`, and are parsed exactly from JSON; Python library callers should pass an integer, decimal string, or `Decimal`, rather than a binary float. Enum checks currently require a string field.
+
+`required` produces `NOT NULL`; it does not reject an empty string. That differs from the CSV validator's empty-cell rule.
+
+**Registry interoperability requires an explicit proposal.** The registry uses `dataset_id`, an `owners` list, `number` rather than `decimal`, and top-level field `enum`; this model uses `contract_id`, one optional `owner`, and nested `check.enum`. `plan_registry_sql` validates the registry's source v0.2 export shape, requires an operator-chosen SQL table name, and returns generated DDL plus `semantic_gaps`. It rejects non-active contracts, registry `number` fields, non-string enums, and target dialects that cannot enforce a declared enum or primary key. Check the export's wire shape before using a different registry source or package version.
+
+```python
+from sql_contract_enforcer import plan_registry_sql
+
+proposal = plan_registry_sql(registry_export, table="users_daily_active", dialect="postgres")
+print(proposal.ddl)
+print(proposal.semantic_gaps)
+```
+
+The adapter preserves field names, required/nullability, string enums, primary key, owner team names, and contract version. It reports semantics DDL alone cannot guarantee, including freshness monitoring, empty-string handling, timestamp behavior, JSON normalization, and target collation. It does not execute the DDL, inspect a database, or satisfy those gaps. A generated proposal requires target-engine tests and a rollback plan before it is applied. Do not infer SQL enforcement from a successful registry or CSV check.
+
 ## Check an existing schema against the contract
 
 Feed the columns you observe (from `information_schema` introspection or a migration plan) and get a violation report:
@@ -82,7 +98,7 @@ sql-contract-enforcer check examples/orders.contract.json examples/orders.observ
 3 violation(s).
 ```
 
-Exit code is non-zero when violations exist — drop it into CI to fail a deploy when a migration drifts from the contract.
+Exit code is non-zero when violations exist. This comparison only checks **required** column presence and nullability against the supplied JSON observation; optional columns may be absent. It does not connect to a database or verify actual column types, uniqueness, checks, primary keys, foreign keys, or whether the target engine enforces those constraints. Supply trustworthy observations; do not treat this as a deployed-boundary check.
 
 ## Library use
 
@@ -107,14 +123,14 @@ ruff check src tests && mypy src
 
 | Concern | Repo |
 | --- | --- |
-| Stores the contract | [`data-contract-registry`](https://github.com/mizcausevic-dev/data-contract-registry) |
-| Validates rows against it (Rust, streaming) | [`csv-data-quality-rs`](https://github.com/mizcausevic-dev/csv-data-quality-rs) |
-| **Enforces it at the table boundary (this repo)** | `sql-contract-enforcer` |
+| Stores registry-shaped contracts | [`data-contract-registry`](https://github.com/mizcausevic-dev/data-contract-registry) |
+| Validates rows against the registry shape (Rust) | [`csv-data-quality-rs`](https://github.com/mizcausevic-dev/csv-data-quality-rs) |
+| Generates DDL from a SQL shape and maps a strict registry v0.2 proposal (this repo) | `sql-contract-enforcer` |
 | Where contracts come from (buyer side) | [`procurement-decision-api`](https://github.com/mizcausevic-dev/procurement-decision-api) |
 
 ## Status
 
-**v0.1.0** — generate + check, four dialects. Python 3.11/3.12/3.13. CI green (ruff + mypy strict + pytest).
+**v0.1.0 source** — generate + check, four dialects. Python 3.11/3.12/3.13 in CI. Release readiness requires the CI results for this change plus target-engine execution and rollback proof.
 
 Roadmap: live `information_schema` introspection adapters · `ALTER TABLE` diff output (migrate an existing table to match the contract) · column type-drift detection in `check` · dbt model generation.
 

@@ -1,10 +1,8 @@
-"""sql-contract-enforcer — turn a data contract into enforceable, cross-dialect DDL.
+"""Generate SQL DDL from a SQL-specific contract model.
 
-Cross-ecosystem hook #5 in the Kinetic Gain portfolio: where
-data-contract-registry stores the contract and csv-data-quality-rs validates
-rows against it, this turns the same contract into the CHECK / NOT NULL /
-UNIQUE / PRIMARY KEY / FOREIGN KEY constraints that stop bad data at the
-table boundary — for Postgres, MySQL, Snowflake, and BigQuery.
+This model differs from data-contract-registry's JSON shape. Constraint
+enforcement varies by engine; check_schema only compares supplied column
+presence and nullability, without connecting to a database.
 
     from sql_contract_enforcer import Contract, generate_ddl, check_schema
 """
@@ -19,6 +17,7 @@ from sql_contract_enforcer.models import (
     Violation,
     load_contract,
 )
+from sql_contract_enforcer.registry_adapter import RegistrySqlProposal, plan_registry_sql
 
 __all__ = [
     "Contract",
@@ -30,5 +29,7 @@ __all__ = [
     "generate_ddl",
     "get_dialect",
     "load_contract",
+    "RegistrySqlProposal",
+    "plan_registry_sql",
 ]
 __version__ = "0.1.0"

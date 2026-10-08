@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from sql_contract_enforcer.dialects import Dialect, get_dialect
 from sql_contract_enforcer.models import Contract, ContractField
 
@@ -29,14 +31,26 @@ def _check_clauses(field: ContractField, dialect: Dialect) -> list[str]:
     if field.check.max is not None:
         clauses.append(f"CHECK ({col} <= {_num(field.check.max)})")
     if field.check.enum:
-        literals = ", ".join(f"'{v}'" for v in field.check.enum)
+        literals = ", ".join(_string_literal(v, dialect) for v in field.check.enum)
         clauses.append(f"CHECK ({col} IN ({literals}))")
     return clauses
 
 
-def _num(value: float) -> str:
-    # Render whole floats without a trailing .0 so DDL reads naturally.
-    return str(int(value)) if float(value).is_integer() else str(value)
+def _string_literal(value: str, dialect: Dialect) -> str:
+    # Backslash and control-character interpretation differs by engine and
+    # session settings. Reject them until a dialect-specific encoder is tested
+    # against real engines. Both quote forms below are documented for their
+    # respective dialects.
+    if any(char == "\\" or ord(char) < 32 or ord(char) in (127, 133, 8232, 8233) for char in value):
+        raise ValueError("enum literals cannot contain backslashes or control characters")
+    escaped = value.replace("'", "\\'" if dialect.name == "bigquery" else "''")
+    return f"'{escaped}'"
+
+
+def _num(value: Decimal) -> str:
+    # Input was validated as an exact, finite decimal within NUMERIC(38,9).
+    rendered = format(value, "f")
+    return rendered.rstrip("0").rstrip(".") if "." in rendered else rendered
 
 
 def generate_ddl(contract: Contract, dialect_name: str) -> str:

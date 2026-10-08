@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from decimal import Decimal
 from typing import Any
 
 from sql_contract_enforcer.check import check_schema
@@ -15,7 +16,7 @@ from sql_contract_enforcer.models import ObservedColumn, load_contract
 
 def _load(path: str) -> Any:
     with open(path, encoding="utf-8") as fh:
-        return json.load(fh)
+        return json.load(fh, parse_float=Decimal)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -31,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
         help="target SQL dialect",
     )
 
-    c = sub.add_parser("check", help="contract vs observed schema -> violations")
+    c = sub.add_parser("check", help="required columns/nullability vs supplied observations")
     c.add_argument("contract", help="path to a contract JSON file")
     c.add_argument("observed", help="path to observed-columns JSON ([{name, nullable}, ...])")
     c.add_argument(
@@ -50,7 +51,9 @@ def main(argv: list[str] | None = None) -> int:
         observed = [ObservedColumn.model_validate(o) for o in _load(args.observed)]
         violations = check_schema(contract, observed, report_extra=args.report_extra)
         if not violations:
-            print("OK: schema satisfies the contract.")
+            print(
+                "OK: supplied required columns and nullability match; other constraints unchecked."
+            )
             return 0
         for v in violations:
             print(str(v))
