@@ -17,6 +17,7 @@ from sql_contract_enforcer.models import (
     Violation,
     load_contract,
 )
+from sql_contract_enforcer.registry_adapter import RegistrySqlProposal, plan_registry_sql
 
 __all__ = [
     "Contract",
@@ -28,5 +29,7 @@ __all__ = [
     "generate_ddl",
     "get_dialect",
     "load_contract",
+    "RegistrySqlProposal",
+    "plan_registry_sql",
 ]
 __version__ = "0.1.0"
