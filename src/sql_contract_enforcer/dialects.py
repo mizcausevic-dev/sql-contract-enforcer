@@ -5,8 +5,8 @@ capture the real cross-dialect quirks:
 
   - BigQuery has NO CHECK constraints, and PK/FK are allowed only as
     `NOT ENFORCED` metadata.
-  - Snowflake parses UNIQUE / CHECK / FK but does NOT enforce them
-    (informational constraints) — only NOT NULL is enforced.
+  - Snowflake standard tables enforce NOT NULL and CHECK; UNIQUE / PK / FK
+    are informational.
   - MySQL needs an explicit length on VARCHAR; CHECK is enforced from 8.0.16.
   - Postgres enforces everything.
 """
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from sql_contract_enforcer.models import LogicalType
+from sql_contract_enforcer.models import LogicalType, validate_identifier
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class Dialect:
 
     def quote(self, ident: str) -> str:
         q = self.identifier_quote
-        return f"{q}{ident}{q}"
+        return f"{q}{validate_identifier(ident)}{q}"
 
     def physical_type(self, logical: LogicalType) -> str:
         return self.type_map[logical]
@@ -82,8 +82,8 @@ SNOWFLAKE = Dialect(
     enforces_unique=False,
     enforces_fk=False,
     notes=(
-        "Snowflake parses UNIQUE/CHECK/FOREIGN KEY but does not enforce them "
-        "(informational constraints). Only NOT NULL is enforced.",
+        "Snowflake standard tables enforce NOT NULL and CHECK; "
+        "UNIQUE/PRIMARY KEY/FOREIGN KEY are informational.",
     ),
 )
 

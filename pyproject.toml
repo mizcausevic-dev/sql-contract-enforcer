@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "sql-contract-enforcer"
 version = "0.1.0"
-description = "Turn a data contract into enforceable, cross-dialect DDL — CHECK / NOT NULL / UNIQUE / PRIMARY KEY / FOREIGN KEY for Postgres, MySQL, Snowflake, and BigQuery — plus a contract-vs-schema violation checker. Cross-ecosystem hook #5 of the Kinetic Gain portfolio."
+description = "Generate dialect-aware DDL from a SQL-specific contract model and compare declared columns with supplied schema observations for Postgres, MySQL, Snowflake, and BigQuery."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
